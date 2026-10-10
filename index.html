@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MOSFET Lab — Interactive IRF540N Simulator</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+<div class="glow glow-a"></div>
+<div class="glow glow-b"></div>
+
+<header>
+  <div>
+    <h1>⚡ MOSFET <span class="grad">Lab</span></h1>
+    <p class="subtitle">Interactive n-channel power MOSFET simulator · common-source amplifier</p>
+  </div>
+  <div class="badges">
+    <span>V(BR)DSS 100 V</span><span>R<sub>DS(on)</sub> 44 mΩ</span><span>I<sub>D</sub> 33 A</span>
+    <span>V<sub>GS(th)</sub> 2.0–4.0 V</span><span>g<sub>fs</sub> 21 S</span><span>Q<sub>g</sub> 71 nC</span>
+  </div>
+</header>
+
+<div class="layout">
+  <!-- ================= CONTROLS ================= -->
+  <aside class="panel">
+    <section class="panel-block">
+      <h2>Device presets</h2>
+      <div class="presets">
+        <button class="preset active" data-vt="3.0" data-k="1.35" data-lam="0.02">IRF540N (power)</button>
+        <button class="preset" data-vt="2.1" data-k="0.15" data-lam="0.05">2N7000 (small signal)</button>
+        <button class="preset" data-vt="1.0" data-k="0.5" data-lam="0.0">Ideal teaching device</button>
+      </div>
+    </section>
+
+    <section class="panel-block">
+      <h2>Bias &amp; circuit</h2>
+      <label class="ctl"><span class="ctl-name">V<sub>GS</sub> <small>gate drive</small></span>
+        <output id="o-vgs">10.0 V</output>
+        <input type="range" id="p-vgs" min="0" max="15" step="0.1" value="10" /></label>
+      <label class="ctl"><span class="ctl-name">V<sub>DD</sub> <small>supply</small></span>
+        <output id="o-vdd">24 V</output>
+        <input type="range" id="p-vdd" min="3" max="100" step="1" value="24" /></label>
+      <label class="ctl"><span class="ctl-name">R<sub>D</sub> <small>drain resistor</small></span>
+        <output id="o-rd">10 Ω</output>
+        <input type="range" id="p-rd" min="0.5" max="2000" step="0.5" value="10" /></label>
+
+      <h2>Model parameters</h2>
+      <label class="ctl"><span class="ctl-name">V<sub>T</sub> <small>threshold</small></span>
+        <output id="o-vt">3.00 V</output>
+        <input type="range" id="p-vt" min="0.2" max="6" step="0.05" value="3.0" /></label>
+      <label class="ctl"><span class="ctl-name">k <small>transconductance factor</small></span>
+        <output id="o-k">1.35 A/V²</output>
+        <input type="range" id="p-k" min="0.02" max="5" step="0.01" value="1.35" /></label>
+      <label class="ctl"><span class="ctl-name">λ <small>channel-length mod.</small></span>
+        <output id="o-lam">0.020 V⁻¹</output>
+        <input type="range" id="p-lam" min="0" max="0.2" step="0.005" value="0.02" /></label>
+
+      <h2>Sweep limits</h2>
+      <label class="ctl"><span class="ctl-name">V<sub>DS</sub> max</span>
+        <output id="o-vdsmax">40 V</output>
+        <input type="range" id="p-vdsmax" min="5" max="100" step="1" value="40" /></label>
+      <label class="ctl"><span class="ctl-name">V<sub>GS</sub> max</span>
+        <output id="o-vgsmax">12.0 V</output>
+        <input type="range" id="p-vgsmax" min="4" max="20" step="0.5" value="12" /></label>
+    </section>
+
+    <section class="panel-block">
+      <label class="backend-toggle">
+        <input type="checkbox" id="use-backend" />
+        Use Python backend (Flask)
+      </label>
+      <div id="backend-status" class="backend-status">Python backend: off — local JS engine</div>
+    </section>
+  </aside>
+
+  <!-- ================= MAIN ================= -->
+  <main>
+    <section class="card op-card">
+      <div class="op-grid">
+        <div class="stats">
+          <div class="stat"><div class="stat-label">Drain current I<sub>D</sub></div><div class="stat-value" id="r-id">—</div></div>
+          <div class="stat"><div class="stat-label">Drain voltage V<sub>DS</sub></div><div class="stat-value" id="r-vds">—</div></div>
+          <div class="stat"><div class="stat-label">Power P = I<sub>D</sub>·V<sub>DS</sub></div><div class="stat-value" id="r-pd">—</div></div>
+          <div class="stat"><div class="stat-label">Dynamic R<sub>DS(on)</sub></div><div class="stat-value" id="r-rds">—</div></div>
+          <div class="stat"><div class="stat-label">Transconductance g<sub>fs</sub></div><div class="stat-value" id="r-gfs">—</div></div>
+          <div class="stat"><div class="stat-label">Region of operation</div>
+            <span id="r-region" class="region-badge region-cutoff">—</span></div>
+        </div>
+        <div class="circuit">
+          <svg viewBox="0 0 340 230" class="circuit-svg">
+            <line x1="60" y1="20" x2="236" y2="20" stroke="#38bdf8" stroke-width="2" />
+            <text id="c-vdd" x="60" y="14" fill="#7dd3fc" font-size="11" font-family="monospace">VDD = 24 V</text>
+            <circle cx="236" cy="20" r="3" fill="#38bdf8" />
+            <line x1="236" y1="20" x2="236" y2="38" stroke="#94a3b8" stroke-width="2" />
+            <rect x="228" y="38" width="16" height="44" rx="3" fill="none" stroke="#e2e8f0" stroke-width="2" />
+            <text id="c-rd" x="252" y="60" fill="#cbd5e1" font-size="11" font-family="monospace">RD = 10 Ω</text>
+            <line x1="236" y1="82" x2="236" y2="108" stroke="#94a3b8" stroke-width="2" />
+            <circle cx="236" cy="108" r="3.5" fill="#facc15" />
+            <text x="248" y="104" fill="#facc15" font-size="10" font-family="monospace">D</text>
+            <text id="c-id" x="188" y="98" fill="#fde68a" font-size="10" font-family="monospace">ID = —</text>
+            <line x1="236" y1="108" x2="208" y2="108" stroke="#94a3b8" stroke-width="2" />
+            <line x1="204" y1="96" x2="204" y2="152" stroke="#e2e8f0" stroke-width="3.5" />
+            <line x1="192" y1="96" x2="192" y2="152" stroke="#e2e8f0" stroke-width="3.5" />
+            <line x1="192" y1="124" x2="140" y2="124" stroke="#94a3b8" stroke-width="2" />
+            <circle cx="140" cy="124" r="3.5" fill="#f472b6" />
+            <text x="52" y="116" fill="#f9a8d4" font-size="11" font-family="monospace">Vin = VGS</text>
+            <text id="c-vgs" x="52" y="130" fill="#f9a8d4" font-size="11" font-family="monospace">= 10.0 V</text>
+            <text x="166" y="118" fill="#94a3b8" font-size="10" font-family="monospace">G</text>
+            <line x1="204" y1="140" x2="236" y2="140" stroke="#94a3b8" stroke-width="2" />
+            <polygon points="214,140 206,135.5 206,144.5" fill="#e2e8f0" />
+            <line x1="236" y1="140" x2="236" y2="186" stroke="#94a3b8" stroke-width="2" />
+            <circle cx="236" cy="140" r="3.5" fill="#facc15" />
+            <text x="248" y="144" fill="#facc15" font-size="10" font-family="monospace">S</text>
+            <text x="290" y="126" fill="#a5b4fc" font-size="10" font-family="monospace">VDS</text>
+            <text id="c-vds" x="290" y="140" fill="#a5b4fc" font-size="10" font-family="monospace">= —</text>
+            <line x1="224" y1="186" x2="248" y2="186" stroke="#94a3b8" stroke-width="2.5" />
+            <line x1="228" y1="192" x2="244" y2="192" stroke="#94a3b8" stroke-width="2" />
+            <line x1="232" y1="198" x2="240" y2="198" stroke="#94a3b8" stroke-width="1.5" />
+          </svg>
+        </div>
+      </div>
+      <div id="op-warning" class="warning" hidden></div>
+    </section>
+
+    <section class="charts">
+      <div class="card">
+        <h3>Drain characteristics — I<sub>D</sub> vs V<sub>DS</sub> <span class="chip">family + load line</span></h3>
+        <canvas id="chart-family" class="chart"></canvas>
+      </div>
+      <div class="card">
+        <h3>Output I–V at selected V<sub>GS</sub> <span class="chip">operating point</span></h3>
+        <canvas id="chart-iv" class="chart"></canvas>
+      </div>
+      <div class="card">
+        <h3>Gate / transfer characteristics — I<sub>D</sub> vs V<sub>GS</sub> <span class="chip">saturation</span></h3>
+        <canvas id="chart-transfer" class="chart"></canvas>
+      </div>
+      <div class="card">
+        <h3>Amplifier transfer — V<sub>in</sub> vs V<sub>out</sub> <span class="chip">common source</span></h3>
+        <canvas id="chart-vout" class="chart"></canvas>
+      </div>
+    </section>
+
+    <footer class="note">
+      Square-law MOSFET model with channel-length modulation: I<sub>D</sub> = k[(V<sub>GS</sub>−V<sub>T</sub>)V<sub>DS</sub> − V<sub>DS</sub>²/2](1+λV<sub>DS</sub>)
+      in triode, I<sub>D</sub> = ½k(V<sub>GS</sub>−V<sub>T</sub>)²(1+λV<sub>DS</sub>) in saturation. Defaults calibrated to the IRF540NPbF
+      datasheet (V<sub>GS(th)</sub> 2.0–4.0 V, R<sub>DS(on)</sub> 44 mΩ @ 10 V, I<sub>D</sub> 33 A). Educational simulation — not a SPICE replacement.
+    </footer>
+  </main>
+</div>
+
+<script src="js/mosfet.js"></script>
+</body>
+</html>
